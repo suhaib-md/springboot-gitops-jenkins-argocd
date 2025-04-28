@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: backend-app
-        image: <REGISTRY_HOST>:5000/backend-app:v1
+        image: <REGISTRY_HOST>:5000/backend-app:v2
         ports:
         - containerPort: 8084
       imagePullSecrets:

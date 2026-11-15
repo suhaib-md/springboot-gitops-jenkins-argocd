@@ -15,7 +15,9 @@ spec:
     spec:
       containers:
       - name: backend-app
-        image: <REGISTRY_HOST>:5000/backend-app:v3
+        # Set to your Nexus Docker registry. The app/ Jenkins pipeline rewrites this line
+        # with <REGISTRY_HOST>/backend-app:v<BUILD_NUMBER> on every build.
+        image: registry.example.com:5000/backend-app:v3
         ports:
         - containerPort: 8084
       imagePullSecrets:

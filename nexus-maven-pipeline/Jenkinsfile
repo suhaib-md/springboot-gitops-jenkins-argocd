@@ -1,5 +1,12 @@
+// Maven build -> Nexus pipeline. Configure the Jenkins job as
+// "Pipeline script from SCM" -> this repo, Script Path: nexus-maven-pipeline/Jenkinsfile.
 pipeline {
     agent any
+
+    parameters {
+        string(name: 'NEXUS_URL', defaultValue: 'localhost:8090',
+               description: 'Nexus host:port (no scheme)')
+    }
     
     tools {
         maven 'Maven-3.9.0'
@@ -10,10 +17,11 @@ pipeline {
         // Nexus and GitHub info
         NEXUS_VERSION = "nexus3"
         NEXUS_PROTOCOL = "http"
-        NEXUS_URL = "localhost:8090"
+        NEXUS_URL = "${params.NEXUS_URL}"
         NEXUS_REPOSITORY = "maven-snapshots"
+        // TODO: create a Jenkins "Username with password" credential for Nexus and put its ID here
         NEXUS_CREDENTIAL_ID = "nexus-credentials"
-        GITHUB_REPO = "https://github.com/suhaibmdv/jenkins_springboot_nexus.git"
+        PROJECT_DIR = "nexus-maven-pipeline"   // this project's folder inside the repo
         
         // POM details (manually entered to avoid security sandbox issues)
         ARTIFACT_ID = "hello-world-spring-boot"
@@ -26,25 +34,25 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Checking out source code from GitHub...'
-                git branch: 'main', url: "${GITHUB_REPO}"
+                checkout scm
             }
         }
 
         stage('Build') {
             steps {
                 echo 'Building the application...'
-                sh 'mvn clean compile'
+                dir(PROJECT_DIR) { sh 'mvn clean compile' }
             }
         }
 
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                sh 'mvn test'
+                dir(PROJECT_DIR) { sh 'mvn test' }
             }
             post {
                 always {
-                    junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
+                    junit testResults: "${PROJECT_DIR}/target/surefire-reports/*.xml", allowEmptyResults: true
                 }
             }
         }
@@ -52,11 +60,11 @@ pipeline {
         stage('Package') {
             steps {
                 echo 'Packaging the application...'
-                sh 'mvn package -DskipTests'
+                dir(PROJECT_DIR) { sh 'mvn package -DskipTests' }
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                    archiveArtifacts artifacts: "${PROJECT_DIR}/target/*.jar", fingerprint: true
                 }
             }
         }
@@ -66,7 +74,7 @@ pipeline {
                 echo 'Deploying artifacts to Nexus...'
                 script {
                     def repositoryName = VERSION.endsWith("SNAPSHOT") ? "maven-snapshots" : "maven-releases"
-                    def artifactPath = "target/${ARTIFACT_ID}-${VERSION}.${PACKAGING}"
+                    def artifactPath = "${PROJECT_DIR}/target/${ARTIFACT_ID}-${VERSION}.${PACKAGING}"
 
                     if (!fileExists(artifactPath)) {
                         error "Artifact file not found: ${artifactPath}"
@@ -90,7 +98,7 @@ pipeline {
                             [
                                 artifactId: ARTIFACT_ID,
                                 classifier: '',
-                                file: "pom.xml",
+                                file: "${PROJECT_DIR}/pom.xml",
                                 type: "pom"
                             ]
                         ]
@@ -103,7 +111,7 @@ pipeline {
         stage('Integration Tests') {
             steps {
                 echo 'Running integration tests...'
-                sh 'mvn verify -DskipUTs'
+                dir(PROJECT_DIR) { sh 'mvn verify -DskipUTs' }
             }
         }
     }
